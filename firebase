@@ -1,0 +1,129 @@
+#include <ArduinoJson.h>
+#include <FirebaseESP8266.h>
+#include <ESP8266WiFi.h>
+#include <SPI.h>         // for communication with Ethernet Shield
+#include "TimeLib.h"     // for update/display of time
+#include <Ethernet.h>    // for communication with NTP Server via UDP
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#define WIFI_SSID "  "
+#define WIFI_PASSWORD "  "
+
+#define FIREBASE_HOST "  "
+#define FIREBASE_AUTH "  "
+
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
+
+FirebaseData firebaseData;
+FirebaseData fbd0o;
+//WiFiClient client
+String path = "/";
+FirebaseJson json;
+String timeNow;
+String pathFirebase = "testUser/field1/measured_data/";
+
+void connectWifi() {
+  Serial.println();
+  WiFi.disconnect();
+  delay(10);
+  Serial.println("Start connect Wifi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.print("Connected with IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+}
+
+void connectFirebase() {
+  Serial.println("Start connect Firebase");
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  Firebase.reconnectWiFi(true);
+  if (Firebase.beginStream(firebaseData, path)) {
+    Serial.println("REASON: " + firebaseData.errorReason());
+  }
+  Serial.println("Connect Firecbase success");
+  Serial.println();
+}
+
+void setTimeDay() {
+  timeClient.begin();
+  // Set offset time in seconds to adjust for your timezone, for example:
+  timeClient.setTimeOffset(25200);// GMT +7
+  timeClient.update();
+  time_t epochTime = timeClient.getEpochTime();
+  Serial.print("Epoch Time: ");
+  Serial.println(epochTime);
+
+  String formattedTime = timeClient.getFormattedTime();
+  Serial.print("Formatted Time: ");
+  Serial.println(formattedTime);
+
+  //Get a time structure
+  struct tm *ptm = gmtime ((time_t *)&epochTime);
+
+  int monthDay = ptm->tm_mday;
+  int currentMonth = ptm->tm_mon + 1;
+  int currentYear = ptm->tm_year + 1900;
+
+  //Print complete date:
+  String currentDate = String(currentYear) + "-" + String(currentMonth) + "-" + String(monthDay);
+  Serial.print("Current date: ");
+  Serial.println(currentDate);
+
+  timeNow = currentDate + "/" + formattedTime;
+  Serial.print("timeNow: ");
+  Serial.println(timeNow);
+  delay(5000);
+}
+
+void printFirebase() {
+  Serial.println("printFirebase");
+    Firebase.setInt(firebaseData, path + "/data", random(0, 100));
+    Firebase.setFloat(firebaseData, "LED", 0);
+    Firebase.setFloat(firebaseData, "/do am/1", random(0, 100));
+  //  Firebase.setFloat(firebaseData, "/do am/2", 0);
+    String dataPath = "/do am/" + String(random(0, 100));
+    Firebase.setFloat(firebaseData, dataPath, random(0, 100));
+  //  Serial.println("donet");
+//    Firebase.setFloat(firebaseData, "/do am/" + random(0, 100), random(0, 100));
+  //  Serial.println("I'm awake, but I'm going into deep sleep mode for 5 seconds");
+    Serial.println(Firebase.setFloat(firebaseData, "/do am/time/" + timeNow, random(0, 100)));
+    Serial.println("printFirebase success");
+}
+
+void setDataField(String fieldName, int humidity30, int humidity60) {
+  Serial.println("Start setDataField " + fieldName);
+  String measured_data = fieldName + "/measured_data/" + timeNow;
+  Firebase.setInt(firebaseData, measured_data + "/humidity30", humidity30);
+  Serial.println(measured_data + "/humidity30: " + humidity30);
+  Firebase.setInt(firebaseData, measured_data + "/humidity60", humidity60);
+  Serial.println(measured_data + "/humidity60: " + humidity60);
+  Serial.println("End setDataField " + fieldName);
+}
+
+void getJsonFirebase() {
+  Serial.println("Start getJsonData");
+  Serial.println("End getJsonData");
+}
+
+void setup() {
+  Serial.begin(115200);
+//  Serial.setTimeout(2000);
+  Serial.println();
+  connectWifi();
+  connectFirebase();
+  setTimeDay();
+  setDataField("testUser/field1", 06, 07 );
+
+Serial.println("Sleep Arduino");
+  ESP.deepSleep(15e6);
+}
+
+void loop(){
+} 
